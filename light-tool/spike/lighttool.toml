@@ -1,0 +1,14 @@
+[tool]
+id = "com.lightfm.radio"
+label = "LightFM"
+versionCode = 1
+versionName = "0.0.1"
+orientation = "portrait"
+permissions = ["android.permission.INTERNET"]
+# detached-audio = keep streaming with the screen off / tool backgrounded. The SDK injects the
+# foreground MediaSessionService + FOREGROUND_SERVICE(_MEDIA_PLAYBACK); those must NOT be under permissions.
+capabilities = ["detached-audio"]
+
+# Real Light Phone III. For the LightOS emulator instead, switch to:
+#   serverPackage = "com.thelightphone.sdk.emulator"
+serverPackage = "com.lightos"
