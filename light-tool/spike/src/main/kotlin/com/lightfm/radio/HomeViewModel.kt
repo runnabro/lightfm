@@ -214,6 +214,8 @@ class HomeViewModel(
 
     // When wheel-tuning is off, don't consume the rotary turns — they fall through to LightOS
     // (screen brightness). The press (play/stop) and volume buttons always work.
+    // Consume down/multiple/up alike: anything we leave unconsumed gets forwarded to LightOS, which
+    // steps the screen brightness off it — so a half-consumed detent tunes AND dims.
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = when (keyCode) {
         KEY_ROTARY_UP -> tuneByWheel(+1)
         KEY_ROTARY_DOWN -> tuneByWheel(-1)
@@ -226,8 +228,15 @@ class HomeViewModel(
     override fun onKeyMultiple(keyCode: Int, repeatCount: Int, event: KeyEvent): Boolean = when (keyCode) {
         KEY_ROTARY_UP -> tuneByWheel(+1)
         KEY_ROTARY_DOWN -> tuneByWheel(-1)
+        KEY_ROTARY_PRESS -> true
         KEY_VOL_UP -> { volumeUp(); true }
         KEY_VOL_DOWN -> { volumeDown(); true }
+        else -> false
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean = when (keyCode) {
+        KEY_ROTARY_UP, KEY_ROTARY_DOWN -> _ui.value.wheelTunes
+        KEY_ROTARY_PRESS, KEY_VOL_UP, KEY_VOL_DOWN -> true
         else -> false
     }
 
