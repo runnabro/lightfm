@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Copy the LightFM tool sources into a light-sdk clone's `tool/` module so it can be built.
 # Usage: ./install-into-sdk.sh [path-to-light-sdk-clone]
-# Default clone path: ../.context/light-sdk
+# Default clone path: ./.context/light-sdk
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
-sdk="${1:-$(cd "$here/../.context/light-sdk" && pwd)}"
-spike="$here/spike"
+sdk="${1:-$(cd "$here/.context/light-sdk" && pwd)}"
+tool_source="$here/tool"
 pkg="com/lightfm/radio"
+source_pkg="$tool_source/src/main/kotlin/$pkg"
+source_assets="$tool_source/src/main/assets"
 
 if [[ ! -d "$sdk/tool" ]]; then
   echo "error: '$sdk' doesn't look like a light-sdk clone (no tool/ dir)." >&2
@@ -15,15 +17,19 @@ if [[ ! -d "$sdk/tool" ]]; then
   exit 1
 fi
 
-echo "Installing LightFM → $sdk/tool"
-rm -rf "$sdk/tool/src/main/kotlin" "$sdk/tool/src/main/assets"
-mkdir -p "$sdk/tool/src/main/kotlin/$pkg"
-cp "$spike/src/main/kotlin/$pkg"/*.kt "$sdk/tool/src/main/kotlin/$pkg/"
-cp "$spike/lighttool.toml" "$sdk/tool/lighttool.toml"
-if [ -d "$spike/src/main/assets" ]; then
-  mkdir -p "$sdk/tool/src/main/assets"
-  cp -R "$spike/src/main/assets/." "$sdk/tool/src/main/assets/"
+if [[ ! -d "$source_pkg" || ! -f "$tool_source/lighttool.toml" || ! -d "$source_assets" ]]; then
+  echo "error: LightFM source files are missing; expected them under '$tool_source'." >&2
+  exit 1
 fi
+
+echo "Installing LightFM → $sdk/tool"
+echo "Only the com/lightfm/radio Kotlin package is replaced; other SDK sources and assets are preserved."
+rm -rf "$sdk/tool/src/main/kotlin/$pkg"
+mkdir -p "$sdk/tool/src/main/kotlin/$pkg"
+cp "$source_pkg"/*.kt "$sdk/tool/src/main/kotlin/$pkg/"
+cp "$tool_source/lighttool.toml" "$sdk/tool/lighttool.toml"
+mkdir -p "$sdk/tool/src/main/assets"
+cp -R "$source_assets/." "$sdk/tool/src/main/assets/"
 
 # The stock SDK exposes no volume control to tools; add a `volume` property to LightAudioPlayer
 # (idempotent) so LightFM can offer a volume slider + volume-button control.

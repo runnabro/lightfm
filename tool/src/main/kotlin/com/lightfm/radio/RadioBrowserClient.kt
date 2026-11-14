@@ -115,11 +115,6 @@ class RadioBrowserClient(private val http: HttpClient) {
                 "&hidebroken=true&is_https=true&order=votes&reverse=true&limit=$limit",
         ).body<List<StationDto>>().mapNotNull { it.toStationOrNull() }
 
-    /** Register a listen (API etiquette). Fire-and-forget; failures ignored. */
-    suspend fun registerClick(uuid: String) {
-        runCatching { http.get("${mirror()}/json/url/$uuid") }
-    }
-
     private fun enc(s: String) = URLEncoder.encode(s.trim(), "UTF-8")
 
     companion object {

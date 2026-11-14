@@ -1,9 +1,15 @@
-# LightFM — light-tool
+![LightFM tuner screenshot](media/lightfm-tuning.png)
 
-An internet-radio player for the Light Phone III, styled like a retro car FM radio.
-The LP3 has no FM tuner chip, so "FM" here is the interaction metaphor: a horizontal
-tuner dial you turn with the hardware dimmer wheel (or swipe), local stations seeded
-from your location, and six memory presets like a car radio's 1–6 buttons.
+# LightFM
+
+An FM radio for the Light Phone III. Tune stations with the hardware dimmer, set local stations with six memory presets.
+
+## License
+
+LightFM's original source code is licensed under the Apache License, Version 2.0.
+See [LICENSE](LICENSE) and [NOTICE](NOTICE). This license does not grant rights to
+third-party SDKs, station streams, or third-party data and other content; see
+[Data sources](#data-sources-three-layers-joined-by-call-sign) for the bundled station data.
 
 A tool can't be built standalone — the SDK's Gradle plugin generates the manifest and
 enforces its API allowlist. Sources live here and are copied into a clone of
@@ -12,15 +18,18 @@ enforces its API allowlist. Sources live here and are copied into a clone of
 
 ## Layout
 
-- `spike/src/main/kotlin/com/lightfm/radio/` — the Kotlin/Compose tool (one screen).
-- `spike/lighttool.toml` — the tool manifest (`INTERNET` permission + the `detached-audio` capability).
-- `install-into-sdk.sh` — copies the sources + toml into an SDK clone's `:tool` module.
+- `tool/src/main/kotlin/com/lightfm/radio/` — the Kotlin/Compose tool (one screen).
+- `tool/lighttool.toml` — the tool manifest (`INTERNET` permission + the `detached-audio` capability).
+- `install-into-sdk.sh` — copies LightFM into an SDK clone's `:tool` module. It replaces only
+  LightFM's `com/lightfm/radio` source package and overlays bundled assets; other Kotlin packages
+  and assets in the SDK clone are left intact. It still overwrites `tool/lighttool.toml` and applies
+  the two documented SDK patches below.
 
 ## Build & run
 
 Prereqs (one-time):
 
-- A clone of `lightphone/light-sdk` (default expected at `../.context/light-sdk`, or pass a path).
+- A clone of `lightphone/light-sdk` (default expected at `./.context/light-sdk`, or pass a path).
 - JDK 17 + Android SDK (platform 36). The SDK's `./gradlew` wrapper handles Gradle 9.
 - A GitHub Packages PAT with `read:packages` in the SDK clone's `local.properties`:
   ```
@@ -60,7 +69,7 @@ cd ~/path/to/light-sdk && ./gradlew :tool:installDebug
 adb logcat | grep -iE "LightFM|ExoPlayer|Media"
 ```
 
-Real Light Phone III — set `serverPackage = "com.lightos"` in `spike/lighttool.toml` first, then:
+Real Light Phone III — set `serverPackage = "com.lightos"` in `tool/lighttool.toml` first, then:
 
 ```sh
 adb devices        # confirm the LP3 is attached
@@ -105,7 +114,7 @@ cd ~/path/to/light-sdk && ./gradlew :tool:installDebug
 
 ## Data sources (three layers, joined by call sign)
 
-1. **Dial — FCC** FM facility database (public domain). Bundled `spike/src/main/assets/fcc_fm.csv`
+1. **Dial — FCC** FM facility database (public domain). Bundled `tool/src/main/assets/fcc_fm.csv`
    (~14.4k licensed US FM + LPFM: `call,freq,lat,lon`). Runtime keeps stations within ~90 km, one per
    channel (nearest wins) → the real frequencies + call signs.
 2. **Commercial streams — `iheart_streams.tsv`** (`CALL\turl\tname`, ~3k entries). Resolved offline
@@ -113,23 +122,15 @@ cd ~/path/to/light-sdk && ./gradlew :tool:installDebug
    KFOX…) as their own public HTTPS simulcast URLs (revma/StreamTheWorld/Amperwave). Preferred stream
    when present; shows the brand name.
 2b. **Public radio — `npr_streams.tsv`** (~994 `CALL\turl\tname`), resolved offline from NPR's Station
-   Finder API (`station.api.npr.org/v3`, enumerate orgIds). All HTTPS, exact call-sign+frequency match,
-   **low ToS** (public radio is freely streamable).
-2c. **Audacy — `audacy_streams.tsv`** (~1.17k), one call to `api.audacy.com/experience/v1/stations`,
-   kept `bband == "FM"` and filtered to call signs present in the FCC table. Authoritative superset of the
-   Audacy mounts we'd otherwise get piecemeal via iHeart.
-2d. **StreamTheWorld/Triton probe — `triton_streams.tsv`** (~318 net-new), a build-time probe of every
-   FCC call sign not already covered: `GET playerservices.streamtheworld.com/api/livestream-redirect/
-   <CALL>FMAAC.aac` (206 = exists). Catches local/independent commercial FMs in no catalog. Same ToS
-   class as iHeart/Audacy.
-2e. **radio.garden — `radiogarden_streams.tsv`** (~1.2k net-new), the **local/community long tail**
+   Finder API (`station.api.npr.org/v3`, enumerate orgIds). All HTTPS, exact call-sign+frequency match.
+2c. **radio.garden — `radiogarden_streams.tsv`** (~1.2k net-new), the **local/community long tail**
    (LPFM, college, ethnic, small-market) our commercial + public-flagship sources miss — e.g. KPOO,
    KALX, KPFA, KDFC. Built offline from radio.garden's place/channel API (`radio.garden/api/ara/…`),
    keeping titles with an FM freq + FCC call sign and resolving each `listen/{id}` 302 to the station's
    **own** direct HTTPS stream (streamguys/berkeley.edu/…). Lowest precedence.
    The five stream layers are merged into one call-sign→stream map (precedence radio.garden < Triton <
    NPR < Audacy < iHeart), checked before Radio Browser.
-2f. **Manual pins — `manual_streams.tsv`** (`CALL\turl\tname`), hand-verified stream URLs merged at the
+2d. **Manual pins — `manual_streams.tsv`** (`CALL\turl\tname`), hand-verified stream URLs merged at the
    **top** precedence — always win. For the long-tail LPFMs in no directory: find the station's own
    HTTPS stream (its site's player / a directory) and add a row. E.g. `KEXC` (SF 92.7 = a KEXP Bay Area
    relay) → `https://kexp-mp3-128.streamguys1.com/kexp128.mp3`.
@@ -138,35 +139,15 @@ cd ~/path/to/light-sdk && ./gradlew :tool:installDebug
    name like "Wild 94.9" rather than a call sign). Still-unmatched channels show the call sign and play
    **static**.
 
-### Coverage / honesty caveat
-
-With the commercial layers, most of a metro's dial now plays (the SF majors all stream). The tradeoff:
-the **commercial** layers (iHeart / Audacy / Triton) point at broadcasters' own public streams that their
-apps use — **their ToS restrict use to their own apps**, so this is a gray area. They're resolved *offline*
-(no runtime calls to those services; the app just hotlinks the public stream), which is the low-risk end for
-a personal device, but it isn't "blessed" and mount URLs can change over time (regenerate the TSVs to
-refresh). **NPR** (public radio) is the clean, freely-streamable layer, and **radio.garden** is mostly
-community/college/LPFM (generally freely streamable, lower risk — though discovered via radio.garden's
-undocumented API at build time; the bundled URLs are the stations' *own* streams). If you'd rather stay
-strictly clean, drop `iheart_streams.tsv` / `audacy_streams.tsv` / `triton_streams.tsv` and it falls back to
-FCC + NPR + radio.garden + Radio Browser (commercial brands then show as static). Radioplayer's API (which
-joins frequency+stream officially) is Europe/Canada-only and partner-gated — not usable for a US tool.
+LightFM bundles direct stream URLs from broadcaster and station sources; it does not host the audio.
 
 ### Regenerating the bundled data
 
 - `fcc_fm.csv`: FCC FM Query text export (`https://transition.fcc.gov/fcc-bin/fmq?...&list=4`), keep
   `service ∈ {FM,FL}` + `status == LIC`, DMS→decimal, dedupe by facility id, strip `-FM/-LP` suffix.
-- `iheart_streams.tsv`: page `https://us.api.iheart.com/api/v2/content/liveStations?limit=20000`, take
-  `callLetters` (strip suffix) + `secure_shoutcast_stream`/`secure_hls_stream` + `name`.
 - `npr_streams.tsv`: enumerate `https://station.api.npr.org/v3/stations/{orgId}` (orgId ~1..2300, no
   auth), keep `brand.band == "FM"`, take `brand.call` + `brand.name` + a `streamsV2[].urls[].href`
   (prefer a direct mp3/aac over a `.pls`, resolving the playlist to its inner URL), dedupe by call sign.
-- `audacy_streams.tsv`: one call `https://api.audacy.com/experience/v1/stations?page[size]=3000`, keep
-  `attributes.bband == "FM"`, strip the FM/AM/HD suffix off `attributes.callsign`, keep only call signs
-  present in `fcc_fm.csv`, take the best `attributes.station_stream[].url` (direct mp3 > aac > hls).
-- `triton_streams.tsv`: for every FCC call sign not already in the iHeart/NPR/Audacy sets, probe
-  `https://playerservices.streamtheworld.com/api/livestream-redirect/<CALL>FMAAC.aac` (HTTP 206 = the
-  mount exists); the probed URL is the bundled stream. ~10k probes, low hit rate (~300).
 - `radiogarden_streams.tsv`: fetch `radio.garden/api/ara/content/places` (filter country=US, ~2.1k
   places), then `…/page/{id}/channels` for each; keep `page.title`s with an FM freq + an FCC call sign
   not already covered; resolve each `…/listen/{cid}/channel.mp3` (follow the 302) to the direct HTTPS
@@ -174,6 +155,15 @@ joins frequency+stream officially) is Europe/Canada-only and partner-gated — n
 
 ## Notes / gotchas
 
+- **Privacy:** When LightFM needs an initial location, it uses IP geolocation via `ipwho.is`, with
+  `ipapi.co` as a fallback; those services receive the device's network IP address. City searches
+  send the typed city name to Light Phone Cloud's geocoding endpoint, while five-digit ZIP searches
+  go to Zippopotam.us. Radio Browser receives the selected country/state to find stations. Playing
+  a station connects directly to that station's stream host, which can observe the device's IP and
+  stream request.
+  LightFM saves the chosen location and station cache locally in the app's DataStore. Avoid entering
+  location details you do not want sent to these providers; their own privacy and retention policies
+  apply.
 - Location: the LP3 sandbox blocks device GPS, so stations are seeded via IP-geolocation over
   HTTPS (`ipwho.is`, then `ipapi.co`), mapped to Radio Browser's `state` filter. Manual entry
   is the fallback. Once you set a location by hand it's **remembered** (persisted to DataStore) and

@@ -336,7 +336,6 @@ class HomeViewModel(
         )
         player.play()
         player.volume = perceptualGain(_ui.value.volume)
-        viewModelScope.launch(Dispatchers.IO) { client.registerClick(station.uuid) }
         startWatchdog()
     }
 
@@ -364,7 +363,12 @@ class HomeViewModel(
         watchdogJob?.cancel()
         watchdogJob = viewModelScope.launch {
             delay(STREAM_WATCHDOG_MS)
-            if (playIntent && !player.isPlaying.value) {
+            if (!playIntent) return@launch
+            if (player.isPlaying.value) {
+                // Reconcile the UI if playback began before the tuning state was set or its
+                // isPlaying notification was missed while replacing the queue.
+                _ui.update { it.copy(isPlaying = true, tuning = false, error = null) }
+            } else {
                 _ui.update { it.copy(tuning = false, error = "Station unavailable") }
                 val playable = playableChannels()
                 if (playable.size > 1) {
