@@ -4,7 +4,7 @@ package com.lightfm.radio
 data class StreamOverride(val url: String, val name: String)
 
 /**
- * Bundled call-sign → public-stream map (`iheart_streams.tsv`, `CALL\turl\tname`). Resolved offline
+ * Bundled call-sign → public-stream map (`iheart_streams.txt`, `CALL\turl\tname`). Resolved offline
  * from broadcaster catalogs; covers the big commercial FM brands (iHeart/Audacy/Cumulus) that the
  * open directories don't carry. These are the broadcasters' own public simulcast URLs.
  */

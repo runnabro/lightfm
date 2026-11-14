@@ -53,12 +53,12 @@ class HomeScreen(private val sealedActivity: SealedLightActivity) :
             lightContext.dataStore,
             DefaultLightAudio(sealedActivity),
             runCatching { lightContext.readAsset("fcc_fm.csv") }.getOrNull(),
-            runCatching { lightContext.readAsset("iheart_streams.tsv") }.getOrNull(),
-            runCatching { lightContext.readAsset("npr_streams.tsv") }.getOrNull(),
-            runCatching { lightContext.readAsset("audacy_streams.tsv") }.getOrNull(),
-            runCatching { lightContext.readAsset("triton_streams.tsv") }.getOrNull(),
-            runCatching { lightContext.readAsset("radiogarden_streams.tsv") }.getOrNull(),
-            runCatching { lightContext.readAsset("manual_streams.tsv") }.getOrNull(),
+            runCatching { lightContext.readAsset("iheart_streams.txt") }.getOrNull(),
+            runCatching { lightContext.readAsset("npr_streams.txt") }.getOrNull(),
+            runCatching { lightContext.readAsset("audacy_streams.txt") }.getOrNull(),
+            runCatching { lightContext.readAsset("triton_streams.txt") }.getOrNull(),
+            runCatching { lightContext.readAsset("radiogarden_streams.txt") }.getOrNull(),
+            runCatching { lightContext.readAsset("manual_streams.txt") }.getOrNull(),
         )
 
     private fun openLocationSearch() =

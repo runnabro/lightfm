@@ -117,20 +117,20 @@ cd ~/path/to/light-sdk && ./gradlew :tool:installDebug
 1. **Dial — FCC** FM facility database (public domain). Bundled `tool/src/main/assets/fcc_fm.csv`
    (~14.4k licensed US FM + LPFM: `call,freq,lat,lon`). Runtime keeps stations within ~90 km, one per
    channel (nearest wins) → the real frequencies + call signs.
-2. **Commercial streams — `iheart_streams.tsv`** (`CALL\turl\tname`, ~3k entries). Resolved offline
+2. **Commercial streams — `iheart_streams.txt`** (`CALL\turl\tname`, ~3k entries). Resolved offline
    from broadcaster catalogs; covers the big brands (Wild 94.9, KMEL, KOIT, Live 105, KBLX, 99.7 NOW,
    KFOX…) as their own public HTTPS simulcast URLs (revma/StreamTheWorld/Amperwave). Preferred stream
    when present; shows the brand name.
-2b. **Public radio — `npr_streams.tsv`** (~994 `CALL\turl\tname`), resolved offline from NPR's Station
+2b. **Public radio — `npr_streams.txt`** (~994 `CALL\turl\tname`), resolved offline from NPR's Station
    Finder API (`station.api.npr.org/v3`, enumerate orgIds). All HTTPS, exact call-sign+frequency match.
-2c. **radio.garden — `radiogarden_streams.tsv`** (~1.2k net-new), the **local/community long tail**
+2c. **radio.garden — `radiogarden_streams.txt`** (~1.2k net-new), the **local/community long tail**
    (LPFM, college, ethnic, small-market) our commercial + public-flagship sources miss — e.g. KPOO,
    KALX, KPFA, KDFC. Built offline from radio.garden's place/channel API (`radio.garden/api/ara/…`),
    keeping titles with an FM freq + FCC call sign and resolving each `listen/{id}` 302 to the station's
    **own** direct HTTPS stream (streamguys/berkeley.edu/…). Lowest precedence.
    The five stream layers are merged into one call-sign→stream map (precedence radio.garden < Triton <
    NPR < Audacy < iHeart), checked before Radio Browser.
-2d. **Manual pins — `manual_streams.tsv`** (`CALL\turl\tname`), hand-verified stream URLs merged at the
+2d. **Manual pins — `manual_streams.txt`** (`CALL\turl\tname`), hand-verified stream URLs merged at the
    **top** precedence — always win. For the long-tail LPFMs in no directory: find the station's own
    HTTPS stream (its site's player / a directory) and add a row. E.g. `KEXC` (SF 92.7 = a KEXP Bay Area
    relay) → `https://kexp-mp3-128.streamguys1.com/kexp128.mp3`.
@@ -145,10 +145,10 @@ LightFM bundles direct stream URLs from broadcaster and station sources; it does
 
 - `fcc_fm.csv`: FCC FM Query text export (`https://transition.fcc.gov/fcc-bin/fmq?...&list=4`), keep
   `service ∈ {FM,FL}` + `status == LIC`, DMS→decimal, dedupe by facility id, strip `-FM/-LP` suffix.
-- `npr_streams.tsv`: enumerate `https://station.api.npr.org/v3/stations/{orgId}` (orgId ~1..2300, no
+- `npr_streams.txt`: enumerate `https://station.api.npr.org/v3/stations/{orgId}` (orgId ~1..2300, no
   auth), keep `brand.band == "FM"`, take `brand.call` + `brand.name` + a `streamsV2[].urls[].href`
   (prefer a direct mp3/aac over a `.pls`, resolving the playlist to its inner URL), dedupe by call sign.
-- `radiogarden_streams.tsv`: fetch `radio.garden/api/ara/content/places` (filter country=US, ~2.1k
+- `radiogarden_streams.txt`: fetch `radio.garden/api/ara/content/places` (filter country=US, ~2.1k
   places), then `…/page/{id}/channels` for each; keep `page.title`s with an FM freq + an FCC call sign
   not already covered; resolve each `…/listen/{cid}/channel.mp3` (follow the 302) to the direct HTTPS
   stream. Needs a browser `User-Agent` + `Referer: https://radio.garden/`. ~2.1k + ~1.5k requests → ~1.2k.
@@ -171,7 +171,7 @@ LightFM bundles direct stream URLs from broadcaster and station sources; it does
 - **Offline:** the whole **dial builds offline** — the FCC table + all the stream URLs are bundled, so with
   a remembered/cached location the app shows the full local band (names, frequencies, which stations
   stream) with **no network** (Radio Browser + IP-geo are online-only bonuses). Empty channels even play
-  their **static** loop offline (bundled `static.wav`). Only the live streams themselves need internet — a
+  their **static** loop offline (bundled `static.bin`). Only the live streams themselves need internet — a
   streamable station tapped offline just reports "Station unavailable." First-ever launch with no network
   *and* no prior location can't seed the dial (needs one online session or a hand-set location).
 - **Screen-off / background audio: works, via the SDK's `detached-audio` capability.** `lighttool.toml`

@@ -122,7 +122,7 @@ class HomeViewModel(
             fccStations = FccStations.parse(fccCsv)
             // Merge stream catalogs by call sign; later sources win. Order low→high precedence:
             // radio.garden (local/community long tail) < Triton probe < NPR (public) < Audacy
-            // (commercial) < iHeart (curated) < manual_streams.tsv (hand-verified pins, always win).
+            // (commercial) < iHeart (curated) < manual_streams.txt (hand-verified pins, always win).
             streamOverrides = StreamOverrides.parse(radioGardenTsv) +
                 StreamOverrides.parse(tritonTsv) +
                 StreamOverrides.parse(nprTsv) +
@@ -354,7 +354,7 @@ class HomeViewModel(
         watchdogJob?.cancel()
         _ui.update { it.copy(tuning = false, error = null) }
         val items = List(STATIC_LOOP) {
-            LightAudioItem(LightAudioSource.AssetSource("static.wav"), LightMediaMetadata(title = "Static"))
+            LightAudioItem(LightAudioSource.AssetSource("static.bin"), LightMediaMetadata(title = "Static"))
         }
         player.setMediaQueue(items, startIndex = 0)
         player.play()
