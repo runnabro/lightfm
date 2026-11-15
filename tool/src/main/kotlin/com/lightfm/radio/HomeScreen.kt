@@ -1,14 +1,8 @@
 package com.lightfm.radio
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -38,7 +32,6 @@ import com.thelightphone.sdk.ui.LightTextVariant
 import com.thelightphone.sdk.ui.LightTheme
 import com.thelightphone.sdk.ui.LightThemeController
 import com.thelightphone.sdk.ui.LightThemeTokens
-import com.thelightphone.sdk.ui.LightTouchableProgressBar
 import com.thelightphone.sdk.ui.gridUnitsAsDp
 import com.thelightphone.sdk.ui.lightClickable
 
@@ -120,14 +113,6 @@ class HomeScreen(private val sealedActivity: SealedLightActivity) :
                         onDismiss = viewModel::closeSheet,
                     )
                 }
-
-                VolumeHud(
-                    visible = state.volumeHudVisible,
-                    hint = state.volumeMaxHint,
-                    volume = state.volume,
-                    onVolume = viewModel::setVolume,
-                    onDismissHint = viewModel::dismissVolumeHint,
-                )
             }
         }
     }
@@ -210,66 +195,15 @@ private fun BottomBar(state: HomeUiState, onPlayStop: () -> Unit) {
 
 // A live stream shows a circle dot (rendered in BottomBar) + this text.
 private fun isLive(state: HomeUiState): Boolean =
-    state.error == null && !state.tuning && state.isPlaying && state.volume > 0f && state.current?.hasStream == true
+    state.error == null && !state.tuning && state.isPlaying && state.current?.hasStream == true
 
 private fun statusText(state: HomeUiState): String = when {
     state.error != null -> state.error
     state.tuning -> "Tuning…"
-    state.isPlaying && state.volume <= 0f -> "Muted"
     state.isPlaying && state.current?.hasStream == true -> "LIVE"
     state.isPlaying && state.current != null -> "No stream"
     state.isPlaying -> "Static"
     else -> "" // stopped: the play button already conveys it
-}
-
-// Transient volume HUD: slides up from the bottom on a volume change, then fades after a delay. At the
-// app's ceiling it shows a hint above the bar (tap to dismiss) — we can't reach the system volume.
-@Composable
-private fun BoxScope.VolumeHud(
-    visible: Boolean,
-    hint: Boolean,
-    volume: Float,
-    onVolume: (Float) -> Unit,
-    onDismissHint: () -> Unit,
-) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-        modifier = Modifier.align(Alignment.BottomCenter),
-    ) {
-        Column(
-            Modifier.fillMaxWidth()
-                .background(LightThemeTokens.colors.background)
-                .padding(horizontal = 1f.gridUnitsAsDp(), vertical = 0.8f.gridUnitsAsDp()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            AnimatedVisibility(visible = hint) {
-                LightText(
-                    "Max app volume, open system volume to get louder.",
-                    variant = LightTextVariant.Detail,
-                    lighten = true,
-                    align = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                        .lightClickable { onDismissHint() }
-                        .padding(bottom = 0.6f.gridUnitsAsDp()),
-                )
-            }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                LightIcon(
-                    icon = if (volume <= 0f) LightIcons.SPEAKER_MUTED else LightIcons.SPEAKER_ON,
-                    size = 1.8f,
-                )
-                Spacer(Modifier.width(0.75f.gridUnitsAsDp()))
-                LightTouchableProgressBar(
-                    colors = LightThemeTokens.colors,
-                    progress = volume,
-                    onValueChange = onVolume,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
 }
 
 @Composable

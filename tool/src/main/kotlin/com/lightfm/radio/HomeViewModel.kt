@@ -9,6 +9,7 @@ import com.thelightphone.sdk.audio.LightAudio
 import com.thelightphone.sdk.audio.LightAudioItem
 import com.thelightphone.sdk.audio.LightAudioPlayback
 import com.thelightphone.sdk.audio.LightAudioPlayer
+import com.thelightphone.sdk.audio.LightPlayerSpec
 import com.thelightphone.sdk.audio.LightAudioSource
 import com.thelightphone.sdk.audio.LightAudioUsage
 import com.thelightphone.sdk.audio.LightMediaMetadata
@@ -32,30 +33,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
-import kotlin.math.pow
 
 // LP3 hardware dimmer wheel, delivered as Android keycodes (see light-keyboard LightDeviceKeys).
 private const val KEY_ROTARY_UP = 317      // one detent "up"   → next channel / station
 private const val KEY_ROTARY_DOWN = 318    // one detent "down" → previous
 private const val KEY_ROTARY_PRESS = 319   // press the wheel   → play / stop
-private const val KEY_VOL_UP = 24
-private const val KEY_VOL_DOWN = 25
-private const val VOL_STEP = 0.08f
-private const val VOLUME_TAPER_DB = 40f // fader range so equal slider steps ≈ equal loudness change
-
-// player.volume is a LINEAR gain (0=silence, 1=unity); perceived loudness is logarithmic, so a linear
-// step near the top barely changes loudness. Map the 0..1 slider position through a dB taper instead,
-// so each press feels like a real volume step (can't raise the ceiling — that's the system volume).
-private fun perceptualGain(position: Float): Float = when {
-    position <= 0f -> 0f
-    position >= 1f -> 1f
-    else -> 10f.pow((position - 1f) * VOLUME_TAPER_DB / 20f)
-}
 
 private const val STREAM_WATCHDOG_MS = 7_000L // no error flow exists → infer a dead stream
 private const val STATIC_LOOP = 120           // repeats of the ~6s static asset (~12 min)
-private const val VOLUME_HUD_MS = 1_800L      // how long the volume HUD lingers after a change
-private const val VOLUME_HINT_MS = 4_000L     // longer linger when showing the "at max" hint, to read it
 private const val FCC_RADIUS_KM = 90.0        // FM reception radius for the local dial
 
 class HomeViewModel(
@@ -78,7 +63,9 @@ class HomeViewModel(
     private val repo = StationRepository(dataStore, client, IpGeoLocationSource(http))
     // Detached = streaming survives the screen going off / leaving the tool (SDK runs a foreground
     // MediaSessionService), the supported replacement for the old wake-mode hack.
-    private val player: LightAudioPlayer = audio.newPlayer(LightAudioUsage.Music, LightAudioPlayback.Detached)
+    private val player: LightAudioPlayer = audio.newPlayer(
+        LightPlayerSpec(usage = LightAudioUsage.Music, playback = LightAudioPlayback.Detached),
+    )
 
     private val _ui = MutableStateFlow(HomeUiState())
     val ui: StateFlow<HomeUiState> = _ui.asStateFlow()
@@ -90,7 +77,6 @@ class HomeViewModel(
     private var playIntent = false
     private var sessionCounter = 0
     private var watchdogJob: Job? = null
-    private var hudHideJob: Job? = null
     private var wheelTarget = -1 // where the wheel is steering the dial; accumulates across a spin, -1 when idle
     private var fccStations: List<FccStation> = emptyList()
     private var streamOverrides: Map<String, StreamOverride> = emptyMap()
@@ -130,9 +116,6 @@ class HomeViewModel(
                 StreamOverrides.parse(overridesTsv) +
                 StreamOverrides.parse(manualTsv)
         }
-        val vol = repo.volume()
-        _ui.update { it.copy(volume = vol) }
-        player.volume = perceptualGain(vol)
         // Prefer a location the user explicitly set; only IP-geo when they never picked one.
         // A live fetch can resolve location but come back with no stations (RB mirror hiccup / slow
         // network). Fall back to the last good cache on empty, not just on a null location.
@@ -213,15 +196,13 @@ class HomeViewModel(
     // ---- Dimmer wheel (delivered to the ViewModel; return true to consume) ----
 
     // When wheel-tuning is off, don't consume the rotary turns — they fall through to LightOS
-    // (screen brightness). The press (play/stop) and volume buttons always work.
+    // (screen brightness). The press still toggles playback; volume keys remain system-controlled.
     // Consume down/multiple/up alike: anything we leave unconsumed gets forwarded to LightOS, which
     // steps the screen brightness off it — so a half-consumed detent tunes AND dims.
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean = when (keyCode) {
         KEY_ROTARY_UP -> tuneByWheel(+1)
         KEY_ROTARY_DOWN -> tuneByWheel(-1)
         KEY_ROTARY_PRESS -> { togglePlayStop(); true }
-        KEY_VOL_UP -> { volumeUp(); true }
-        KEY_VOL_DOWN -> { volumeDown(); true }
         else -> false
     }
 
@@ -229,14 +210,12 @@ class HomeViewModel(
         KEY_ROTARY_UP -> tuneByWheel(+1)
         KEY_ROTARY_DOWN -> tuneByWheel(-1)
         KEY_ROTARY_PRESS -> true
-        KEY_VOL_UP -> { volumeUp(); true }
-        KEY_VOL_DOWN -> { volumeDown(); true }
         else -> false
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean = when (keyCode) {
         KEY_ROTARY_UP, KEY_ROTARY_DOWN -> _ui.value.wheelTunes
-        KEY_ROTARY_PRESS, KEY_VOL_UP, KEY_VOL_DOWN -> true
+        KEY_ROTARY_PRESS -> true
         else -> false
     }
 
@@ -250,32 +229,6 @@ class HomeViewModel(
         wheelTarget = (base + delta).coerceIn(0, FM_CHANNEL_COUNT - 1)
         _dialCommands.tryEmit(DialCommand.To(wheelTarget))
         return true
-    }
-
-    // Volume buttons: step up until the app's ceiling, then surface the "go to system volume" hint.
-    fun volumeUp() {
-        val next = (_ui.value.volume + VOL_STEP).coerceAtMost(1f)
-        setVolumeInternal(next, hint = next >= 1f)
-    }
-
-    fun volumeDown() = setVolumeInternal((_ui.value.volume - VOL_STEP).coerceAtLeast(0f), hint = false)
-
-    fun setVolume(v: Float) = setVolumeInternal(v.coerceIn(0f, 1f), hint = false)
-
-    fun dismissVolumeHint() {
-        hudHideJob?.cancel()
-        _ui.update { it.copy(volumeHudVisible = false, volumeMaxHint = false) }
-    }
-
-    private fun setVolumeInternal(vol: Float, hint: Boolean) {
-        _ui.update { it.copy(volume = vol, volumeHudVisible = true, volumeMaxHint = hint) }
-        player.volume = perceptualGain(vol)
-        viewModelScope.launch { repo.saveVolume(vol) }
-        hudHideJob?.cancel()
-        hudHideJob = viewModelScope.launch {
-            delay(if (hint) VOLUME_HINT_MS else VOLUME_HUD_MS)
-            _ui.update { it.copy(volumeHudVisible = false, volumeMaxHint = false) }
-        }
     }
 
     /** Play the tuned channel, or fully stop the stream (so it doesn't keep streaming when idle). */
@@ -344,7 +297,6 @@ class HomeViewModel(
             startIndex = 0,
         )
         player.play()
-        player.volume = perceptualGain(_ui.value.volume)
         startWatchdog()
     }
 
@@ -358,7 +310,6 @@ class HomeViewModel(
         }
         player.setMediaQueue(items, startIndex = 0)
         player.play()
-        player.volume = perceptualGain(_ui.value.volume)
     }
 
     private fun stopPlayback() {
@@ -463,7 +414,6 @@ class HomeViewModel(
 
     override fun onCleared() {
         watchdogJob?.cancel()
-        hudHideJob?.cancel()
         player.release()
         http.close()
         super.onCleared()
