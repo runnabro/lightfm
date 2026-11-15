@@ -1,8 +1,8 @@
 [tool]
 id = "com.lightfm.radio"
 label = "LightFM"
-versionCode = 2
-versionName = "1.0.2"
+versionCode = 3
+versionName = "1.0.5"
 orientation = "portrait"
 permissions = ["android.permission.INTERNET"]
 # detached-audio = keep streaming with the screen off / tool backgrounded. The SDK injects the
