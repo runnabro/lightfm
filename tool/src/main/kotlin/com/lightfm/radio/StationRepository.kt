@@ -4,7 +4,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.decodeFromString
@@ -99,12 +98,6 @@ class StationRepository(
         runCatching { dataStore.edit { it[K_VERTICAL] = enabled } }
     }
 
-    suspend fun volume(): Float = dataStore.data.first()[K_VOL] ?: 0.85f
-
-    suspend fun saveVolume(v: Float) {
-        runCatching { dataStore.edit { it[K_VOL] = v } }
-    }
-
     companion object {
         private val K_STATIONS = stringPreferencesKey("lightfm_stations")
         private val K_LABEL = stringPreferencesKey("lightfm_location_label")
@@ -115,6 +108,5 @@ class StationRepository(
         private val K_SNAP = booleanPreferencesKey("lightfm_snap")
         private val K_WHEEL = booleanPreferencesKey("lightfm_wheel_tunes")
         private val K_VERTICAL = booleanPreferencesKey("lightfm_vertical_dial")
-        private val K_VOL = floatPreferencesKey("lightfm_volume")
     }
 }

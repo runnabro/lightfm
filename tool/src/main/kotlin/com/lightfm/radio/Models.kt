@@ -91,9 +91,6 @@ data class HomeUiState(
     val wheelTunes: Boolean = true,
     val verticalDial: Boolean = false,
     val sheetOpen: Boolean = false,
-    val volume: Float = 0.85f,
-    val volumeHudVisible: Boolean = false,
-    val volumeMaxHint: Boolean = false, // at the app's ceiling → nudge toward system volume
 ) {
     val current: Station? get() = stationByChannel[currentChannel]
     val hasStations: Boolean get() = stationByChannel.isNotEmpty()

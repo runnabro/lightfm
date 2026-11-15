@@ -23,7 +23,7 @@ enforces its API allowlist. Sources live here and are copied into a clone of
 - `install-into-sdk.sh` — copies LightFM into an SDK clone's `:tool` module. It replaces only
   LightFM's `com/lightfm/radio` source package and overlays bundled assets; other Kotlin packages
   and assets in the SDK clone are left intact. It still overwrites `tool/lighttool.toml` and applies
-  the two documented SDK patches below.
+  the documented HLS dependency patch below.
 
 ## Build & run
 
@@ -39,15 +39,11 @@ Prereqs (one-time):
   (the SDK pulls `light-keyboard` from GitHub Packages.)
 
 The SDK's `:tool` module already applies the serialization + KSP plugins and depends on
-`:sdk:client`, so Ktor / kotlinx-serialization / DataStore / Media3 all come transitively —
-this install adds no Gradle config.
+`:sdk:client`, so Ktor / kotlinx-serialization / DataStore / Media3 come transitively. HLS playback
+needs one additional Media3 module, which the installer adds to the local SDK clone's
+`tool/build.gradle.kts`.
 
-> **SDK patches (two, all idempotent, applied by `install-into-sdk.sh`):**
-> 1. **Volume** — the stock SDK exposes no volume control, so it adds a `volume` property to
->    `sdk/client/.../audio/LightAudioPlayer.kt` (marker `// LightFM-volume`), mirroring the SDK's own `speed`
->    property (`commands.dispatch { it.volume = v }`) so it queues until the player connects and works in
->    detached mode. Without it the volume slider + volume buttons wouldn't compile.
-> 2. **HLS** — the SDK's media3 setup omits the HLS module, so any `.m3u8` stream (many radio streams,
+> **SDK patch — HLS:** the SDK's media3 setup omits the HLS module, so any `.m3u8` stream (many radio streams,
 >    incl. ~170 of the bundled ones) crashes ExoPlayer with `ClassNotFoundException`. It adds
 >    `androidx.media3:media3-exoplayer-hls` (matching the SDK's media3 version) to `tool/build.gradle.kts`
 >    (marker `// LightFM-hls`). The app also guards at runtime, treating DASH/SmoothStreaming/`.pls`/`.m3u`
@@ -58,7 +54,7 @@ this install adds no Gradle config.
 > runs a foreground `MediaSessionService`. The old `WAKE_LOCK`/wake-mode hack was removed when we bumped the
 > SDK to the version that added detached audio.
 >
-> Re-running the installer is safe (all patches no-op if already present).
+> Re-running the installer is safe (the patch no-ops if already present).
 
 Emulator (default; `lighttool.toml` ships with `serverPackage = "com.thelightphone.sdk.emulator"`):
 
@@ -91,12 +87,8 @@ cd ~/path/to/light-sdk && ./gradlew :tool:installDebug
 - **Play / stop:** a permanent **bottom bar** shows the current status on the left and a play/stop
   button on the right (also the wheel press, 319) that starts or fully stops the stream — so it isn't
   streaming when you're not listening.
-- **Volume:** press the hardware volume buttons; a volume HUD **slides up from the bottom** (a slider)
-  and **fades after ~2s**. Level is persisted, and the slider position is mapped through a **dB taper**
-  so each step is an even, native-feeling loudness change (ExoPlayer's raw gain is linear). This is a
-  per-app gain layered under the system volume — it can't exceed it, and a tool can't reach the system
-  volume (sandbox), so at the top it shows a hint: *"Max app volume, open system volume to get louder."*
-  (Needs the SDK volume patch — see below.)
+- **Volume:** LightFM has no separate media-volume control. The device's hardware volume keys adjust
+  ringer volume, not LightFM playback.
 - **⋯ (top-right) → options half-sheet:** *Snap to stations* (Light UI toggle, persisted) — a **fling/
   swipe** settles on the nearest station that actually streams, skipping call-sign-only/static channels;
   the **wheel** always steps channel-by-channel (through the empties) so you can glide to any frequency; *Wheel
